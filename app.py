@@ -4,6 +4,9 @@ import json
 import pandas as pd 
 import numpy as np
 from datasketches import frequent_strings_sketch, frequent_items_error_type 
+from openai import OpenAI
+
+
 
 class SketchUnwrapper:
     def __init__(self) -> None:
@@ -92,6 +95,7 @@ class SketchUnwrapper:
         return play_df, time_df 
 
 def main():
+    
     st.title("Unwrapping Spotify's Unwrapped")
 
     # upload all of the json files
@@ -111,6 +115,7 @@ def main():
             df['endTime'] = pd.to_datetime(df['endTime'], format='%Y-%m-%d %H:%M')
             df["minsPlayed"] = df["msPlayed"]/(60*1000) 
             df = df[df["endTime"].dt.strftime("%Y") == "2023"]
+            df = df[df["endTime"].dt.strftime("%m") < "11"]
             df = df[df["minsPlayed"] > 0.5]
             sk_wrap.minibatch_update(df)
     
@@ -143,6 +148,35 @@ def main():
                 x=lab,
                 y=alt.Y("Track", sort=None),  
             ).properties(height=500, width=750))
+
+        # Add a switch (checkbox)
+        switch_status = st.checkbox("Do you want artist/song recommendations?")
+        # Display a message based on the switch status
+        if switch_status:
+            print("Getting the GPT predictions for artists...")
+            top_artists_str = ""
+            for a in artist_plays["Artist"]:
+                top_artists_str += a + ", "
+
+            client = OpenAI()
+            # defaults to getting the key using os.environ.get("OPENAI_API_KEY")
+            # if you saved the key under a different environment variable name, you can do something like:
+            # client = OpenAI(
+            #   api_key=os.environ.get("CUSTOM_ENV_NAME"),
+            # )
+            recommender = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "My top artists are " + top_artists_str + "and I want to listen to more artists like them.  Recommend five more artists."},
+            ]
+            )
+            recs = recommender.choices[0].message.content
+            st.success("### Your recommendations are...\n",)
+            st.success(recs)
+
+
+        else:
+            st.warning("Skipping recommendation step.")
         
 
 if __name__ == "__main__":
