@@ -6,6 +6,16 @@ import numpy as np
 from datasketches import frequent_strings_sketch, frequent_items_error_type 
 from openai import OpenAI
 
+colours = {
+    "artist": alt.value('red'),
+    "tracks": alt.value('steelblue'),
+    "podcasts": alt.value('chartreuse')
+}#, '#F4D03F', '#D35400', '#7D3C98']
+# pd.DataFrame({
+#     'x': range(6),
+#     'color': ['red', 'steelblue', 'chartreuse', '#F4D03F', '#D35400', '#7D3C98']
+# })
+
 
 
 class SketchUnwrapper:
@@ -33,17 +43,34 @@ class SketchUnwrapper:
         self.yearly_songs_num_plays = frequent_strings_sketch(self.songs_k)
         self.yearly_songs_cum_time = frequent_strings_sketch(self.songs_k)
 
-        self.fi_sk = frequent_strings_sketch(self.artist_k)
+        # album sketches
+        self.monthly_album_num_plays = {m : frequent_strings_sketch(self.songs_k) for m in range(1,11)}
+        self.monthly_album_cum_time = {m : frequent_strings_sketch(self.songs_k) for m in range(1,11)}
+        self.yearly_album_num_plays = frequent_strings_sketch(self.songs_k)
+        self.yearly_album_cum_time = frequent_strings_sketch(self.songs_k)
+
+        # podcast sketches: keep only yearly summary as expect lower traffic
+        self.yearly_podcast_num_plays = frequent_strings_sketch(self.songs_k)
+        self.yearly_podcast_cum_time = frequent_strings_sketch(self.songs_k)
 
     def minibatch_update(self, df:pd.DataFrame) -> None:
         """
         Updates the monthly sketches with the current minibatch defined by df
         """
-        for _, row in df.iterrows():
-            self.monthly_artists_num_plays[row["endTime"].month].update(item=row["artistName"], weight=1)
-            self.monthly_artists_cum_time[row["endTime"].month].update(item=row["artistName"], weight=np.ceil(row["minsPlayed"]).astype(int))
-            self.monthly_songs_num_plays[row["endTime"].month].update(item=row["trackName"], weight=1)
-            self.monthly_songs_cum_time[row["endTime"].month].update(item=row["trackName"], weight=np.ceil(row["minsPlayed"]).astype(int))
+        song_df = df[df["minsPlayed"] <= 10.]
+        podcast_df = df[df["minsPlayed"] > 10.]
+
+        for _, row in song_df.iterrows():
+            update_month = row["endTime"].month
+            self.monthly_artists_num_plays[update_month].update(item=row["artistName"], weight=1)
+            self.monthly_artists_cum_time[update_month].update(item=row["artistName"], weight=np.ceil(row["minsPlayed"]).astype(int))
+            self.monthly_songs_num_plays[update_month].update(item=row["trackName"], weight=1)
+            self.monthly_songs_cum_time[update_month].update(item=row["trackName"], weight=np.ceil(row["minsPlayed"]).astype(int))
+            #self.monthly_album_num_plays[update_month].update(item=row["albumName"], weight=1)
+        
+        for _, row in podcast_df.iterrows():
+            self.yearly_podcast_num_plays.update(item=row["artistName"], weight=1)
+            self.yearly_podcast_cum_time.update(item=row["artistName"], weight=np.ceil(row["minsPlayed"]).astype(int))
 
     def update_yearly_sketches(self,) -> None:
         """
@@ -54,7 +81,10 @@ class SketchUnwrapper:
             self.yearly_artists_cum_time.merge(self.monthly_artists_cum_time[month])    
         for month, month_sk in self.monthly_songs_num_plays.items():
             self.yearly_songs_num_plays.merge(month_sk)
-            self.yearly_songs_cum_time.merge(self.monthly_songs_cum_time[month])  
+            self.yearly_songs_cum_time.merge(self.monthly_songs_cum_time[month]) 
+        for month, month_sk in self.monthly_album_num_plays.items():
+            self.yearly_album_num_plays.merge(month_sk)
+            #self.yearly_album_cum_time.merge(self.monthly_album_cum_time[month]) 
 
     def make_yearly_top_artists(self, df:pd.DataFrame) -> None:
         for _, row in df.iterrows():
@@ -75,15 +105,6 @@ class SketchUnwrapper:
         time_df.sort_values(by="Time (hours)", inplace=True, ascending=False)
         return play_df, time_df  
 
-    # def make_yearly_top_songs(self, df:pd.DataFrame) -> None:
-    #     for _, row in df.iterrows():
-    #         if row["minsPlayed"] > 0.5:
-    #             self.monthly_songs_num_plays[row["endTime"].month].update(item=row["trackName"], weight=1)
-    #             self.monthly_songs_cum_time[row["endTime"].month].update(item=row["trackName"], weight=np.ceil(row["minsPlayed"]).astype(int))
-    #     for month, month_sk in self.monthly_songs_num_plays.items():
-    #         self.yearly_songs_num_plays.merge(month_sk)
-    #         self.yearly_songs_cum_time.merge(self.monthly_songs_cum_time[month])   
-
     def get_yearly_song_summaries(self) -> (pd.DataFrame, pd.DataFrame):
         """Uses the yearly artist summaries to make the bar charts"""
         track_streams = [ [a[0], a[1]] for a in self.yearly_songs_num_plays.get_frequent_items(frequent_items_error_type.NO_FALSE_POSITIVES)[:self.top_k_songs]]
@@ -93,6 +114,21 @@ class SketchUnwrapper:
         play_df.sort_values(by="Streams", inplace=True, ascending=False)
         time_df.sort_values(by="Time (hours)", inplace=True, ascending=False)
         return play_df, time_df 
+    
+    def get_yearly_album_summaries(self) -> pd.DataFrame:
+        album_streams = [ [a[0], a[1]] for a in self.yearly_album_num_plays.get_frequent_items(frequent_items_error_type.NO_FALSE_POSITIVES)[:self.top_k_artists]]
+        play_df = pd.DataFrame(album_streams, columns=["Album", "Streams"])
+        return play_df
+    
+    def get_yearly_podcast_summaries(self) -> (pd.DataFrame, pd.DataFrame):
+        """Uses the yearly artist summaries to make the bar charts"""
+        podcast_streams = [ [a[0], a[1]] for a in self.yearly_podcast_num_plays.get_frequent_items(frequent_items_error_type.NO_FALSE_POSITIVES)[:self.top_k_artists]]
+        podcast_times = [ [a[0], a[1] / 60] for a in self.yearly_podcast_cum_time.get_frequent_items(frequent_items_error_type.NO_FALSE_POSITIVES)[:self.top_k_artists]]
+        play_df = pd.DataFrame(podcast_streams, columns=["Podcast", "Streams"])
+        time_df = pd.DataFrame(podcast_times, columns=["Podcast", "Time (hours)"])
+        play_df.sort_values(by="Streams", inplace=True, ascending=False)
+        time_df.sort_values(by="Time (hours)", inplace=True, ascending=False)
+        return play_df, time_df
 
 def main():
     
@@ -133,7 +169,8 @@ def main():
             st.write(f"### Your top 5 artists by {out} are...")
             st.write(alt.Chart(a).mark_bar().encode(
                 x=lab,
-                y=alt.Y("Artist", sort=None),  
+                y=alt.Y("Artist", sort=None), 
+                color=colours["artist"]
             ).properties(height=500, width=750))
 
         # Song summaries and plot
@@ -146,8 +183,31 @@ def main():
             st.write(f"### Your top 5 tracks by {out} are...")
             st.write(alt.Chart(a).mark_bar().encode(
                 x=lab,
-                y=alt.Y("Track", sort=None),  
+                y=alt.Y("Track", sort=None),
+                color=colours["tracks"]  
             ).properties(height=500, width=750))
+
+        # Podcast summaries and plot
+        podcast_plays, podcast_time = sk_wrap.get_yearly_podcast_summaries()
+        for a, lab in zip([podcast_plays, podcast_time], ["Streams", "Time (hours)"]):
+            if lab == "Streams":
+                out = "number of streams"
+            else:
+                out = "total time (hours)"
+            st.write(f"### Your top 5 podcasts by {out} are...")
+            st.write(alt.Chart(a).mark_bar().encode(
+                x=lab,
+                y=alt.Y("Podcast", sort=None),
+                color=colours["podcasts"]  
+            ).properties(height=500, width=750))
+
+        # album summaries and plot
+        # album_plays  = sk_wrap.get_yearly_album_summaries()
+        # st.write(f"### Your top 5 Albums by {out} are...")
+        # st.write(alt.Chart(album_plays).mark_bar().encode(
+        #         x=lab,
+        #         y=alt.Y("Track", sort=None),  
+        # ).properties(height=500, width=750))
 
         # Add a switch (checkbox)
         switch_status = st.checkbox("Do you want artist/song recommendations?")
@@ -181,3 +241,13 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+    # def make_yearly_top_songs(self, df:pd.DataFrame) -> None:
+    #     for _, row in df.iterrows():
+    #         if row["minsPlayed"] > 0.5:
+    #             self.monthly_songs_num_plays[row["endTime"].month].update(item=row["trackName"], weight=1)
+    #             self.monthly_songs_cum_time[row["endTime"].month].update(item=row["trackName"], weight=np.ceil(row["minsPlayed"]).astype(int))
+    #     for month, month_sk in self.monthly_songs_num_plays.items():
+    #         self.yearly_songs_num_plays.merge(month_sk)
+    #         self.yearly_songs_cum_time.merge(self.monthly_songs_cum_time[month])   
