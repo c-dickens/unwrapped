@@ -53,9 +53,36 @@ class SpotifyClient:
         result = requests.get(url, headers=headers, params=params)
         json_result = json.loads(result.content)["tracks"]
         return json_result
+    
+    def get_genre_from_artist(self, artist_id:str) -> list:
+        url = f"https://api.spotify.com/v1/artists/{artist_id}"
+        headers = self.get_auth_header()
+        result = requests.get(url, headers=headers)
+        json_result = json.loads(result.content)["genres"]
+        return json_result
+    
+    def get_genres_from_artist_list(self, artist_list:list) -> list:
+        artist_genres = {}
+        for artist in artist_list:
+            if artist in artist_genres.keys():
+                artist_genres[artist]["count"] += 1
+            else:
+                # not in dict so perform the lookup
+                _, artist_id = self.search_for_artist_id(artist)
+                genres = self.get_genre_from_artist(artist_id)
+                artist_genres[artist] = {"genres" : genres, "count" : 1}
+        return artist_genres
 
     def print_songs(self, songs:dict) -> None:
         # Create a list of lists for tabulation
         table_data = [[idx + 1, song['name'], song['album']['name']] for idx, song in enumerate(songs)]
         headers = ["#", "Song Name", "Album Name"]
         print(tabulate(table_data, headers, tablefmt="fancy_grid"))
+
+    # def get_genres_from_song(self, song_id:str) -> list:
+    #     url = f"https://api.spotify.com/v1/tracks/{song_id}"
+    #     headers = self.get_auth_header()
+    #     result = requests.get(url, headers=headers)
+    #     json_result = json.loads(result.content)["artists"][0]["genres"]
+    #     #print(song_id, json_result)
+    #     return json_result
