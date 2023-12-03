@@ -10,9 +10,10 @@ class SpotifyClient:
         load_dotenv() # need .env in same directory as main.py
         self.client_id = os.getenv("CLIENT_ID")
         self.client_secret = os.getenv("CLIENT_SECRET")
+        self._set_token()
         pass
     
-    def set_token(self) -> None:
+    def _set_token(self) -> None:
         """
         Sets the class token attribute to the access token from Spotify API
         """
