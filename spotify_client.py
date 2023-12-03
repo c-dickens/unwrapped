@@ -2,8 +2,11 @@ import os
 import base64
 import requests 
 import json
+import numpy as np
 from dotenv import load_dotenv
 from tabulate import tabulate
+from thefuzz import fuzz
+import warnings
 
 class SpotifyClient:
     def __init__(self):
@@ -32,19 +35,32 @@ class SpotifyClient:
 
     def get_auth_header(self) -> dict:
         return {"Authorization" : f"Bearer {self.token}"}
+
+    # def search_for_artist_by_track(self, track:str) -> tuple[str, str] | None:
+    #     pass
     
-    def search_for_artist_id(self, artist_name:str) -> tuple[str, str] | None:
+    def search_for_artist_id(self, artist_name:str, track:str=None) -> tuple[str, str] | tuple[None, None]:
         """returns (artist_name, artist_id)""" 
         url = "https://api.spotify.com/v1/search"
         headers = self.get_auth_header()
-        params = {"q" : artist_name, "type" : "artist"} # equivalent to query = f"q={artist_name}&type=artist&limit=1"
+        params = {"q" : artist_name, "type" : "artist", "limit": 5} # equivalent to query = f"q={artist_name}&type=artist&limit=1"
         result = requests.get(url, headers=headers, params=params)
         json_result = json.loads(result.content)["artists"]["items"]
         if len(json_result) == 0:
-            print(f"Could not find artist {artist_name}")
-            return None
-        else:
+            warning_message = f"Could not find artist {artist_name}"
+            warnings.warn(warning_message, UserWarning)
+            return None, None
+        test_artist_name = json_result[0]["name"]
+        if test_artist_name.lower() == artist_name.lower():
             return json_result[0]["name"], json_result[0]["id"]
+        else:
+            # no match - lookup and do manual match
+            # We need this fix for ambiguous names (eg. Dave, Beck)
+            # Modified from https://stackoverflow.com/questions/65101111/spotipy-wrong-several-artist-coming-up-when-i-use-sp-search
+            artist_names = [artist["name"] for artist in json_result]
+            artist_scores = np.array([fuzz.ratio(artist_name, artist) for artist in artist_names])
+            selected_artist_idx = np.argmax(artist_scores)
+            return json_result[selected_artist_idx]["name"], json_result[selected_artist_idx]["id"]
 
     def get_songs_by_artist(self, artist_id:str) -> dict:
         url = f"https://api.spotify.com/v1/artists/{artist_id}/top-tracks"
@@ -54,12 +70,20 @@ class SpotifyClient:
         json_result = json.loads(result.content)["tracks"]
         return json_result
     
-    def get_genre_from_artist(self, artist_id:str) -> list:
+    def get_genre_from_artist(self, artist_id:str) -> list :
+        """
+        Returning an empty list for consistency between output modes on if conditional
+        """
         url = f"https://api.spotify.com/v1/artists/{artist_id}"
         headers = self.get_auth_header()
         result = requests.get(url, headers=headers)
-        json_result = json.loads(result.content)["genres"]
-        return json_result
+        if result.status_code == 400:
+            # invalaid query
+            return []
+        json_result = json.loads(result.content)
+        if json_result is not None:
+            return json_result["genres"]
+        return []
     
     def get_genres_from_artist_list(self, artist_list:list) -> list:
         artist_genres = {}

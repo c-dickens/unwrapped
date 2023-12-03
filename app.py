@@ -29,7 +29,6 @@ class SketchUnwrapper:
         self.top_k_artists = 5
         self.top_k_songs = 10
         self.top_ks = {"artist" : self.top_k_artists, "songs": self.top_k_songs}
-        self.sza_count = 0
 
         # Artist sketches
         self.monthly_artists_num_plays = {m : frequent_strings_sketch(8) for m in range(1,11)}
