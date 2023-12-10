@@ -9,6 +9,7 @@ from openai import OpenAI
 colours = {
     "artist": alt.value('red'),
     "tracks": alt.value('steelblue'),
+    "albums": alt.value('purple'), #"#7D3C98
     "podcasts": alt.value('chartreuse')
 }#, '#F4D03F', '#D35400', '#7D3C98']
 # pd.DataFrame({
@@ -56,7 +57,9 @@ def main():
         unwrapped.finalise_dataframes(all_dfs)
         year_top_artist_streams, year_top_artist_time = unwrapped.get_yearly_top_artists()
         year_top_songs_streams, year_top_songs_time = unwrapped.get_yearly_top_songs()
+        year_top_albums_streams, year_top_albums_cum_time = unwrapped.get_yearly_top_albums()
         year_top_podcs_streams, year_top_podcs_time = unwrapped.get_yearly_top_podcasts()
+        
 
         # Sketch approaches 
         # sk_wrap.update_yearly_sketches() # merge the month summaries into the year summary
@@ -88,6 +91,20 @@ def main():
                 x=lab,
                 y=alt.Y("Track", sort=None),
                 color=colours["tracks"]  
+            ).properties(height=500, width=750))
+
+    
+        # Album summaries and plot
+        for a, lab in zip([year_top_albums_streams, year_top_albums_cum_time], ["Streams", "Time (hours)"]):
+            if lab == "Streams":
+                out = "number of streams"
+            else:
+                out = "total time (hours)"
+            st.write(f"### Your top 5 albums by {out} are...")
+            st.write(alt.Chart(a).mark_bar().encode(
+                x=lab,
+                y=alt.Y("Album", sort=None),
+                color=colours["albums"]  
             ).properties(height=500, width=750))
 
         # Podcast summaries and plot

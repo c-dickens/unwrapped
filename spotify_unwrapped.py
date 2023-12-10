@@ -5,6 +5,7 @@ from typing import Tuple, List
 from tabulate import tabulate
 from spotify_client import SpotifyClient
 
+
 class SpotifyUnwrapped:
     """
     Class to analyse the data from the Spotify user data.
@@ -17,8 +18,9 @@ class SpotifyUnwrapped:
         """
         self.top_k_artists = 5
         self.top_k_songs = 10
-        self.top_ks = {"artist" : self.top_k_artists, "songs": self.top_k_songs}
+        self.top_ks = {"artist" : self.top_k_artists, "songs": self.top_k_songs, "album" : self.top_k_artists}
         self.dataframes_finalised = False
+        self.spotify_client = SpotifyClient()   
 
     def json_batch_update(self, fname:str | st.runtime.uploaded_file_manager.UploadedFile) -> pd.DataFrame:
         """
@@ -58,7 +60,9 @@ class SpotifyUnwrapped:
             else:
                 df = pd.concat(dfs, axis=0)
         self.dataframes_finalised = True
-        self.song_df = df[df["minsPlayed"] <= 10.]
+        
+        self.df = df.iloc[:250] # remove for debugging later
+        self.song_df = self.df[self.df["minsPlayed"] <= 10.]
         self.podcast_df = df[df["minsPlayed"] > 10.]
 
     def get_total_num_songs(self, df:pd.DataFrame) -> int:
@@ -103,18 +107,34 @@ class SpotifyUnwrapped:
         top_podcast_cum_time["Time (hours)"] /= 60
         return top_podcasts_num_plays, top_podcast_cum_time
     
-    # def get_yearly_top_albums(self, df:pd.DataFrame) -> list:
-    #     top_albums_num_plays = df[["albumName"]].value_counts().head(self.top_k_songs)
-    #     print(top_albums_num_plays)
+    def get_yearly_top_albums(self) -> list:
+        """
+        To do: Replace with sampling for this step to avoid querying everything.
+        """
+        assert self.dataframes_finalised, "Dataframes have not been finalised."
+        artist_song_list = list(self.song_df[["artistName", "trackName"]].itertuples(index=False, name=None))
+        print(artist_song_list)
+        album_list = self.spotify_client.get_album_from_song_list(artist_song_list)
+        self.song_df["albumName"] = album_list
+        print(self.song_df)
+        top_albums_num_plays = self.song_df[["albumName"]].value_counts().head(self.top_ks["album"])
+        top_albums_cum_time = self.song_df.groupby("albumName").agg({"minsPlayed": "sum"}).sort_values(by="minsPlayed", ascending=False).head(self.top_ks["album"])  
+
+        # reset headers for compatibility with Altair
+        top_albums_num_plays = top_albums_num_plays.reset_index().rename(columns={"count" : "Streams", "albumName" : "Album"})
+        top_albums_cum_time = top_albums_cum_time.reset_index().rename(columns={"minsPlayed" : "Time (hours)", "albumName" : "Album"})
+        top_albums_cum_time["Time (hours)"] /= 60
+        print(top_albums_num_plays)
+        print(top_albums_cum_time)
+        return top_albums_num_plays, top_albums_cum_time
 
     def add_genres_to_df(self, df:pd.DataFrame) -> pd.DataFrame:
         """
         Add the genres to the dataframe.
         """
         all_artists = list(df["artistName"].unique())
-        spotify_client = SpotifyClient()
         #Slow! -->artist_to_genres = {a : a["genres"] for a in spotify_client.get_genres_from_artist_list(all_artists[:10])}
-        resp = spotify_client.get_genres_from_artist_list(all_artists)
+        resp = self.spotify_client.get_genres_from_artist_list(all_artists)
         genre_df = pd.DataFrame(resp).T
         genre_df.drop(columns=["count"], inplace=True)
         genre_df.reset_index()
@@ -122,8 +142,9 @@ class SpotifyUnwrapped:
         df["genres"] = df['artistName'].map(genre_dict) 
         return df
     
-    def get_yearly_top_genres(self, df:pd.DataFrame) -> list:
-        pass
+    # def get_yearly_top_genres(self, df:pd.DataFrame) -> list:
+    #     artist_to_genres = []
+        #resp = self.spotify_client.get_genres_from_artist_list(all_artists)
         #
         #spotify_client = SpotifyClient()
         #artist_to_genres = {a : a["genres"] for a in spotify_client.get_genres_from_artist_list(all_artists[:10])}

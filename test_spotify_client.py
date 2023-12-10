@@ -20,7 +20,7 @@ def test_album_lookup_from_song():
                ("haim", "now i'm in it"), 
                ("foals", "the runner"),
                ("Tierra Whack", "hookers"),
-               ("yard act", "rich")
+               ("yard act", "rich"),
                ]
     answers = ["psychodrama", "lover", "women in music pt. iii", 
                "everything not saved will be lost part ii",
@@ -29,6 +29,16 @@ def test_album_lookup_from_song():
         album = spotify_client.get_album_from_song(q[1], q[0])
         if album is not None:
             assert album.lower() == a.lower()
+
+    queries = queries + [("foals", "the runner"),
+                        ("dave", "location"),
+                        ("dave", "purple heart"),]
+    answers = answers + ["everything not saved will be lost part ii", "psychodrama", "psychodrama"]
+    album_list = spotify_client.get_album_from_song_list(queries)
+    for resp, ans in zip(album_list, answers):
+        assert resp.lower() == ans.lower()
+    print(album_list)
+    
 
 def test_genre_lookup_from_song():
     """

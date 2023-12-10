@@ -87,6 +87,23 @@ class SpotifyClient:
         track = track[0]
         album_name = track['album']['name']
         return album_name
+    
+    def get_album_from_song_list(self, artist_song_list:list) -> dict:
+        """
+        Given a list of (song, artist) pairs, return a dictionary of (song, album) pairs.
+        """
+        song_albums = [None for _ in range(len(artist_song_list))]
+        song_album_dict = {}
+        for i, (artist, song) in enumerate(artist_song_list):
+            print(i)
+            if artist in song_album_dict and song in song_album_dict[artist]:
+                song_albums[i] = song_album_dict[artist][song]
+                continue
+            album = self.get_album_from_song(song, artist)
+            song_albums[i] = album
+            song_album_dict[artist] = {}
+            song_album_dict[artist][song] = album
+        return song_albums #list(song_album_dict.values())
         
     def get_genre_from_artist(self, artist_id:str) -> list :
         """
