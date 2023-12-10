@@ -9,6 +9,7 @@ from thefuzz import fuzz
 import warnings
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
+from typing import List, Tuple
 from pprint import PrettyPrinter
 
 class SpotifyClient:
@@ -72,12 +73,21 @@ class SpotifyClient:
         return json_result
     
     def get_album_from_song(self, song_name:str, artist_name:str) -> str:
+        """
+        nb. not an obvious way to optimize this by memoizing the seen 
+        artists (as in for genres) because artists have one list of genres
+        but multiple distinct albums.
+        """
         results = self.sp.search(q=f'track:{song_name} artist:{artist_name}', type='track')
-        track = results['tracks']['items'][0]
+        track = results['tracks']['items']
+        if len(track) == 0:
+            warning_message = f"Could not find song {song_name} by {artist_name}"
+            warnings.warn(warning_message, UserWarning)
+            return None
+        track = track[0]
         album_name = track['album']['name']
         return album_name
         
-    
     def get_genre_from_artist(self, artist_id:str) -> list :
         """
         Returning an empty list for consistency between output modes on if conditional
