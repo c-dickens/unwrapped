@@ -1,3 +1,5 @@
+import os
+import time
 import altair as alt
 import streamlit as st
 import json
@@ -24,31 +26,29 @@ def main():
     # upload all of the json files
     uploaded_file = st.file_uploader("Choose a JSON file", accept_multiple_files=True, type=["json"])
 
+
+    analysis_options = {
+        "standard" : "Standard (Top 5 Artists, Songs, Podcasts, Artist Recommendations)",
+        "detailed" : "Detailed (Top 5 Artists, Songs, Albums, Podcasts, Artist Recommendations, genres and albums)"
+    }
     option = st.selectbox(
         'Which version would you like?',
-        ("Standard (Top 5 Artists, Songs, Podcasts, Artist Recommendations)",
-        "Detailed (Top 5 Artists, Songs, Albums, Podcasts, Artist Recommendations, genres and albums)")
-        )
-    st.write('You selected:', option)
+        (analysis_options["standard"],
+        analysis_options["detailed"])
+    )
+    st.write('You selected:', option)    
+
+    # Add a switch (checkbox)
+    recommendation_switch = st.checkbox("Do you want artist/song recommendations?")
+    st.write("Recommendations will also be provided.  Please be patient with the query.")
+
 
     with st.form(key='my_form_to_submit'):
         submit_button = st.form_submit_button(label='Submit')
 
-    
-
     if submit_button and uploaded_file is not None:
-        # options = st.multiselect(
-        # 'What are your favorite colors',
-        # ['Standard (Top 5 Artists, Songs, Podcasts, Artist Recommendations)',
-        # 'Detailed (Top 5 Artists, Songs, Albums, Podcasts, Artist Recommendations, genres and albums)'],
-        # ['Standard (Top 5 Artists, Songs, Podcasts, Artist Recommendations)'])
-
-        
-
-
         # the main object that we will update with each item
-        #sk_wrap = SketchUnwrapper()
-        unwrapped = SpotifyUnwrapped()
+        unwrapped = SpotifyUnwrapped() # sk_wrap = SketchUnwrapper()
 
         # stream the data
         all_dfs = []
@@ -56,34 +56,13 @@ def main():
             #json_data = json.load(file)
             df = unwrapped.json_batch_update(file)
             all_dfs.append(df)
-            # Step 2: Convert JSON data to a DataFrame
-            #df = pd.json_normalize(json_data)
-            # df = pd.read_csv(uploaded_file, header=0, names=dtypes.keys(),
-            #             dtype=dtypes, parse_dates=parse_dates)
-            # df['endTime'] = pd.to_datetime(df['endTime'], format='%Y-%m-%d %H:%M')
-            # df["minsPlayed"] = df["msPlayed"]/(60*1000) 
-            # df = df[df["endTime"].dt.strftime("%Y") == "2023"]
-            # df = df[df["endTime"].dt.strftime("%m") < "11"]
-            # df = df[df["minsPlayed"] > 0.5]
-            # sk_wrap.minibatch_update(df)
-        # if streaming_complete:
-        #     yearly_data = pd.concat(all_dfs, axis=0)
-        
     
         # outputs
         st.write("## Unwrapping your 2023 Spotify Data...")
         unwrapped.finalise_dataframes(all_dfs)
         year_top_artist_streams, year_top_artist_time = unwrapped.get_yearly_top_artists()
         year_top_songs_streams, year_top_songs_time = unwrapped.get_yearly_top_songs()
-        year_top_albums_streams, year_top_albums_cum_time = unwrapped.get_yearly_top_albums()
         year_top_podcs_streams, year_top_podcs_time = unwrapped.get_yearly_top_podcasts()
-        
-
-        # Sketch approaches 
-        # sk_wrap.update_yearly_sketches() # merge the month summaries into the year summary
-        # artist_plays, artist_time = sk_wrap.get_yearly_artist_summaries()
-        # song_plays, song_time = sk_wrap.get_yearly_song_summaries()
-        # podcast_plays, podcast_time = sk_wrap.get_yearly_podcast_summaries()
         
         # artist plots
         for a, lab in zip([year_top_artist_streams, year_top_artist_time], ["Streams", "Time (hours)"]):
@@ -111,20 +90,6 @@ def main():
                 color=colours["tracks"]  
             ).properties(height=500, width=750))
 
-    
-        # Album summaries and plot
-        for a, lab in zip([year_top_albums_streams, year_top_albums_cum_time], ["Streams", "Time (hours)"]):
-            if lab == "Streams":
-                out = "number of streams"
-            else:
-                out = "total time (hours)"
-            st.write(f"### Your top 5 albums by {out} are...")
-            st.write(alt.Chart(a).mark_bar().encode(
-                x=lab,
-                y=alt.Y("Album", sort=None),
-                color=colours["albums"]  
-            ).properties(height=500, width=750))
-
         # Podcast summaries and plot
         for a, lab in zip([year_top_podcs_streams, year_top_podcs_time], ["Streams", "Time (hours)"]):
             if lab == "Streams":
@@ -138,6 +103,23 @@ def main():
                 color=colours["podcasts"]  
             ).properties(height=500, width=750))
 
+        if option == analysis_options["detailed"]:
+            year_top_albums_streams, year_top_albums_cum_time = unwrapped.get_yearly_top_albums()
+            # Album summaries and plot
+            for a, lab in zip([year_top_albums_streams, year_top_albums_cum_time], ["Streams", "Time (hours)"]):
+                if lab == "Streams":
+                    out = "number of streams"
+                else:
+                    out = "total time (hours)"
+                st.write(f"### Your top 5 albums by {out} are...")
+                st.write(alt.Chart(a).mark_bar().encode(
+                    x=lab,
+                    y=alt.Y("Album", sort=None),
+                    color=colours["albums"]  
+                ).properties(height=500, width=750))
+
+         
+
         # to do integrate album and podcasts into the unwrapped app.
 
         # # album summaries and plot
@@ -148,30 +130,32 @@ def main():
         # #         y=alt.Y("Track", sort=None),  
         # # ).properties(height=500, width=750))
 
-        # # Add a switch (checkbox)
-        # switch_status = st.checkbox("Do you want artist/song recommendations?")
-        # # Display a message based on the switch status
-        # if switch_status:
-        #     print("Getting the GPT predictions for artists...")
-        #     top_artists_str = ""
-        #     for a in artist_plays["Artist"]:
-        #         top_artists_str += a + ", "
+        if recommendation_switch:
+            #load_dotenv() # need .env in same directory as main.py
+            #open_ai_api_key = os.getenv("OPENAI_API_KEY")
+            print("Getting the GPT predictions for artists...")
+            top_artists_str = ""
+            for a in year_top_artist_streams["Artist"]:
+                top_artists_str += a + ", "
+            print(top_artists_str)
 
-        #     client = OpenAI()
-        #     # defaults to getting the key using os.environ.get("OPENAI_API_KEY")
-        #     # if you saved the key under a different environment variable name, you can do something like:
-        #     # client = OpenAI(
-        #     #   api_key=os.environ.get("CUSTOM_ENV_NAME"),
-        #     # )
-        #     recommender = client.chat.completions.create(
-        #     model="gpt-3.5-turbo",
-        #     messages=[
-        #         {"role": "system", "content": "My top artists are " + top_artists_str + "and I want to listen to more artists like them.  Recommend five more artists."},
-        #     ]
-        #     )
-        #     recs = recommender.choices[0].message.content
-        #     st.success("### Your recommendations are...\n",)
-        #     st.success(recs)
+            #client = OpenAI()
+            # defaults to getting the key using os.environ.get("OPENAI_API_KEY")
+            # # if you saved the key under a different environment variable name, you can do something like:
+            client = OpenAI(
+              api_key=os.environ.get("OPENAI_API_KEY"),
+            )
+            with st.spinner('Please weait. Generating recommendations...'):
+                time.sleep(5)
+                recommender = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "My top artists are " + top_artists_str + "and I want to listen to more artists like them.  Recommend five more artists."},
+                ]
+                )
+            recs = recommender.choices[0].message.content
+            st.success("### Your recommendations are...\n",)
+            st.success(recs)
 
 
         # else:
