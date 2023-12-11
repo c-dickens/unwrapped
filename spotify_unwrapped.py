@@ -61,7 +61,7 @@ class SpotifyUnwrapped:
                 df = pd.concat(dfs, axis=0)
         self.dataframes_finalised = True
         
-        self.df = df.iloc[:250] # remove for debugging later
+        self.df = df#.iloc[:250] # remove for debugging later
         self.song_df = self.df[self.df["minsPlayed"] <= 10.]
         self.podcast_df = df[df["minsPlayed"] > 10.]
 
@@ -107,14 +107,15 @@ class SpotifyUnwrapped:
         top_podcast_cum_time["Time (hours)"] /= 60
         return top_podcasts_num_plays, top_podcast_cum_time
     
-    def get_yearly_top_albums(self) -> list:
+    def get_yearly_top_albums(self, sample_rate:float=0.01) -> list:
         """
         To do: Replace with sampling for this step to avoid querying everything.
         """
+        assert 0 < sample_rate <= 1, "Sample rate must be between 0 and 1."
         assert self.dataframes_finalised, "Dataframes have not been finalised."
         artist_song_list = list(self.song_df[["artistName", "trackName"]].itertuples(index=False, name=None))
         print(artist_song_list)
-        album_list = self.spotify_client.get_album_from_song_list(artist_song_list)
+        album_list = self.spotify_client.get_album_from_song_list(artist_song_list, sample_rate)
         self.song_df["albumName"] = album_list
         print(self.song_df)
         top_albums_num_plays = self.song_df[["albumName"]].value_counts().head(self.top_ks["album"])

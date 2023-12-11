@@ -104,31 +104,36 @@ def main():
             ).properties(height=500, width=750))
 
         if option == analysis_options["detailed"]:
-            year_top_albums_streams, year_top_albums_cum_time = unwrapped.get_yearly_top_albums()
+            
             # Album summaries and plot
-            for a, lab in zip([year_top_albums_streams, year_top_albums_cum_time], ["Streams", "Time (hours)"]):
-                if lab == "Streams":
-                    out = "number of streams"
-                else:
-                    out = "total time (hours)"
-                st.write(f"### Your top 5 albums by {out} are...")
-                st.write(alt.Chart(a).mark_bar().encode(
-                    x=lab,
-                    y=alt.Y("Album", sort=None),
-                    color=colours["albums"]  
-                ).properties(height=500, width=750))
+            with st.spinner('Please wait. Calculating your top albums...'):
+                time.sleep(5)
+                year_top_albums_streams, year_top_albums_cum_time = unwrapped.get_yearly_top_albums(sample_rate=0.01)
+                st.write(f"### Your top 5 Albums by {out} are...\n{list(year_top_albums_streams['Album'])}")
+
+            # with st.spinner('Please wait. Calculating your top genres...'):
+            #     time.sleep(5)
+            #     year_top_albums_streams, year_top_albums_cum_time = unwrapped.get_yearly_top_albums(sample_rate=0.01)
+            #     st.write(f"### Your top 5 Albums by {out} are...\n{list(year_top_albums_streams['Album'])}")
+            #     print(year_top_albums_streams)
+            #     print(year_top_albums_cum_time)
+           
+            # for a, lab in zip([year_top_albums_streams, year_top_albums_cum_time], ["Streams", "Time (hours)"]):
+            #     if lab == "Streams":
+            #         out = "number of streams"
+            #     else:
+            #         out = "total time (hours)"
+            #     st.write(f"### Your top 5 albums by {out} are...")
+            #     st.write(alt.Chart(a).mark_bar().encode(
+            #         x=lab,
+            #         y=alt.Y("Album", sort=None),
+            #         color=colours["albums"]  
+            #     ).properties(height=500, width=750))
 
          
 
         # to do integrate album and podcasts into the unwrapped app.
-
-        # # album summaries and plot
-        # # album_plays  = sk_wrap.get_yearly_album_summaries()
-        # # st.write(f"### Your top 5 Albums by {out} are...")
-        # # st.write(alt.Chart(album_plays).mark_bar().encode(
-        # #         x=lab,
-        # #         y=alt.Y("Track", sort=None),  
-        # # ).properties(height=500, width=750))
+        # album summaries and plot
 
         if recommendation_switch:
             #load_dotenv() # need .env in same directory as main.py
@@ -145,7 +150,7 @@ def main():
             client = OpenAI(
               api_key=os.environ.get("OPENAI_API_KEY"),
             )
-            with st.spinner('Please weait. Generating recommendations...'):
+            with st.spinner('Please wait. Generating recommendations...'):
                 time.sleep(5)
                 recommender = client.chat.completions.create(
                 model="gpt-3.5-turbo",
