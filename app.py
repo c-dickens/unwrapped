@@ -24,10 +24,28 @@ def main():
     # upload all of the json files
     uploaded_file = st.file_uploader("Choose a JSON file", accept_multiple_files=True, type=["json"])
 
+    option = st.selectbox(
+        'Which version would you like?',
+        ("Standard (Top 5 Artists, Songs, Podcasts, Artist Recommendations)",
+        "Detailed (Top 5 Artists, Songs, Albums, Podcasts, Artist Recommendations, genres and albums)")
+        )
+    st.write('You selected:', option)
+
     with st.form(key='my_form_to_submit'):
         submit_button = st.form_submit_button(label='Submit')
 
+    
+
     if submit_button and uploaded_file is not None:
+        # options = st.multiselect(
+        # 'What are your favorite colors',
+        # ['Standard (Top 5 Artists, Songs, Podcasts, Artist Recommendations)',
+        # 'Detailed (Top 5 Artists, Songs, Albums, Podcasts, Artist Recommendations, genres and albums)'],
+        # ['Standard (Top 5 Artists, Songs, Podcasts, Artist Recommendations)'])
+
+        
+
+
         # the main object that we will update with each item
         #sk_wrap = SketchUnwrapper()
         unwrapped = SpotifyUnwrapped()
