@@ -111,7 +111,37 @@ class SpotifyClient:
             song_albums[sampled_ids[i]] = album
             song_album_dict[artist] = {}
             song_album_dict[artist][song] = album
-        return song_albums #list(song_album_dict.values())
+        return song_albums 
+    
+    def _download_and_write_image(self, image_url:str, image_destination:str) -> None:
+        """
+        Writes the downloaded image to a file
+        """
+        response = requests.get(image_url)
+        if response.status_code == 200:
+            with open(image_destination, 'wb') as file:
+                file.write(response.content)
+            print(f"Image downloaded successfully to {image_destination}")
+        else:
+            print(f"Failed to download image. Status code: {response.status_code}")
+
+
+    def get_album_artwork(self, artist_album_list:List[Tuple[str, str]]) -> None:
+        """
+        For every artist in the dataframe, get the album artwork for the top album
+        and write the image to a file.
+        Do this by getting the artist id and making a small number of calls to the API.
+        """
+        headers = self.get_auth_header()
+        for artist, album in artist_album_list:
+            artist_id = self.search_for_artist_id(artist)[1]
+            url = f"https://api.spotify.com/v1/artists/{artist_id}/albums?limit=50"
+            result = json.loads(requests.get(url, headers=headers).content)
+            album_names = [a["name"] for a in result["items"]]
+            album_scores = np.array([fuzz.ratio(a, album) for a in album_names])
+            selected_album_idx = np.argmax(album_scores)
+            selected_album_dict = result["items"][selected_album_idx]
+            self._download_and_write_image(selected_album_dict["images"][1]["url"], f"album_artwork/{artist}_{album}.jpg")
         
     def get_genre_from_artist(self, artist_id:str) -> list :
         """
