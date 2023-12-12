@@ -95,9 +95,9 @@ class SpotifyClient:
         np.random.seed(235151123) # arbitrary seed
         n = len(artist_song_list)
         sample_size = np.ceil(sample_rate*n).astype(int)
+        print(f"Sampling {sample_size} songs from {n} songs")
         sampled_ids = np.random.choice(n, sample_size, replace=False)
         sampled_data = [artist_song_list[i] for i in sampled_ids]
-        print(f"SAMPLING {sample_size} IDS from {n} total")
         song_albums = [None for _ in range(len(artist_song_list))]
         song_album_dict = {}
         #for i, (artist, song) in enumerate(artist_song_list):
@@ -141,7 +141,7 @@ class SpotifyClient:
             album_scores = np.array([fuzz.ratio(a, album) for a in album_names])
             selected_album_idx = np.argmax(album_scores)
             selected_album_dict = result["items"][selected_album_idx]
-            self._download_and_write_image(selected_album_dict["images"][1]["url"], f"album_artwork/{artist}_{album}.jpg")
+            self._download_and_write_image(selected_album_dict["images"][0]["url"], f"album_artwork/{artist}_{album}.jpg")
         
     def get_genre_from_artist(self, artist_id:str) -> list :
         """
