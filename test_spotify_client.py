@@ -35,48 +35,32 @@ def test_album_lookup_from_song():
                         ("dave", "purple heart"),]
     answers = answers + ["everything not saved will be lost part ii", "psychodrama", "psychodrama"]
     spotify_client = SpotifyClient()
-    album_list = spotify_client.get_album_from_song_list(queries)
+    album_list = spotify_client.get_album_from_song_list(queries, sample_rate=1.)
     for resp, ans in zip(album_list, answers):
         assert resp.lower() == ans.lower()
     print(album_list)
 
-def test_album_lookups_sample():
-    np.random.seed(1235123462)
+def test_album_artwork():
+    """
+    for every artist in the dataframe, get the album artwork for the top album.
+    Do this by getting the artist id and making a small number of calls to the API.
+    """
     queries = [
                ("dave", "streatham"), 
                ("taylor swift", "i forgot that you existed"), 
                ("haim", "now i'm in it"), 
                ("foals", "the runner"),
-               ("Tierra Whack", "hookers"),
                ("yard act", "rich"),
-               ]
-    queries = queries + [("foals", "the runner"),
-                        ("dave", "location"),
-                        ("dave", "purple heart"),]
+    ]
     answers = ["psychodrama", "lover", "women in music pt. iii", 
                "everything not saved will be lost part ii",
-               "whack world", "the overload"]
-    answers = answers + ["everything not saved will be lost part ii", "psychodrama", "psychodrama"]
-    #n = len(queries)
-    #sample_rate = 0.5
-    €sample_size = np.ceil(sample_rate*n).astype(int)
-    sampled_ids = np.random.choice(n, sample_size, replace=False)
-    print(sampled_ids)
-    albums = [None for _ in range(n)]
-    sampled_data = [queries[i] for i in sampled_ids]
-    sampled_answers = [answers[i] for i in sampled_ids]
+              "the overload"]
     spotify_client = SpotifyClient()
-    album_list = spotify_client.get_album_from_song_list(sampled_data)
-    for ii, (resp, ans) in enumerate(zip(album_list, sampled_answers)):
+    album_list = spotify_client.get_album_from_song_list(queries, sample_rate=1.)
+    for resp, ans in zip(album_list, answers):
         assert resp.lower() == ans.lower()
-        albums[sampled_ids[ii]] = resp
-    album_counter = Counter(albums)
-    album_counter_scaled = {k : v / sample_rate  for k, v in album_counter.items() if k != None}
-    print(albums)
-    print(album_counter)
-    print(album_counter_scaled)
-    
-    
+    artist_album_list = [(q[0], a) for q, a in zip(queries, album_list)]
+    spotify_client.get_album_artwork(artist_album_list)
 
 def test_genre_lookup_from_song():
     """
@@ -95,7 +79,7 @@ def test_genre_lookup_from_song():
 def main():
     #test_album_lookup_from_song()
     #test_genre_lookup_from_song()
-    test_album_lookups_sample()
+    test_album_artwork()
     
 if __name__ == "__main__":
     main()
