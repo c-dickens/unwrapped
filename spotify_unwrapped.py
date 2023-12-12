@@ -107,27 +107,39 @@ class SpotifyUnwrapped:
         top_podcast_cum_time["Time (hours)"] /= 60
         return top_podcasts_num_plays, top_podcast_cum_time
     
-    def get_yearly_top_albums(self, sample_rate:float=0.01) -> list:
+    def get_yearly_top_albums(self, sample_rate:float=0.01) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         To do: Replace with sampling for this step to avoid querying everything.
         """
         assert 0 < sample_rate <= 1, "Sample rate must be between 0 and 1."
         assert self.dataframes_finalised, "Dataframes have not been finalised."
         artist_song_list = list(self.song_df[["artistName", "trackName"]].itertuples(index=False, name=None))
-        print(artist_song_list)
         album_list = self.spotify_client.get_album_from_song_list(artist_song_list, sample_rate)
         self.song_df["albumName"] = album_list
-        print(self.song_df)
-        top_albums_num_plays = self.song_df[["albumName"]].value_counts().head(self.top_ks["album"])
-        top_albums_cum_time = self.song_df.groupby("albumName").agg({"minsPlayed": "sum"}).sort_values(by="minsPlayed", ascending=False).head(self.top_ks["album"])  
+        sampled_albums = self.song_df[self.song_df["albumName"].notna()]
+       
 
-        # reset headers for compatibility with Altair
-        top_albums_num_plays = top_albums_num_plays.reset_index().rename(columns={"count" : "Streams", "albumName" : "Album"})
-        top_albums_cum_time = top_albums_cum_time.reset_index().rename(columns={"minsPlayed" : "Time (hours)", "albumName" : "Album"})
+        # can ignore the None values as they are not in the top k anyway
+        top_albums_num_plays = sampled_albums[["artistName", "albumName"]].value_counts().head(self.top_ks["album"])
+        top_albums_cum_time = sampled_albums.groupby(["artistName", "albumName"]).agg({"minsPlayed": "sum"}).sort_values(by="minsPlayed", ascending=False).head(self.top_ks["album"])  
+       
+
+        # reset headers for consistency
+        top_albums_num_plays = top_albums_num_plays.reset_index().rename(columns={"count" : "Streams", "albumName" : "Album", "artistName" : "Artist"})
+        top_albums_cum_time = top_albums_cum_time.reset_index().rename(columns={"minsPlayed" : "Time (hours)", "albumName" : "Album", "artistName" : "Artist"})
         top_albums_cum_time["Time (hours)"] /= 60
-        print(top_albums_num_plays)
-        print(top_albums_cum_time)
         return top_albums_num_plays, top_albums_cum_time
+    
+    def get_yearly_album_artwork(self, df:pd.DataFrame) -> None:
+        """
+        For every artist in the top album dataframe, get the album artwork and return the filepath
+        so that streamlit can display it.
+        """
+        artist_albums = df[["Artist", "Album"]]
+        artist_album_list = []
+        for _, row in artist_albums.iterrows():
+            artist_album_list.append((row["Artist"], row["Album"]))
+        self.spotify_client.get_album_artwork(artist_album_list)
 
     def add_genres_to_df(self, df:pd.DataFrame) -> pd.DataFrame:
         """

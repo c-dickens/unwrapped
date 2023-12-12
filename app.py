@@ -38,6 +38,10 @@ def main():
     )
     st.write('You selected:', option)    
 
+    if option == analysis_options["detailed"]:
+        sample_rate = st.slider('Please select your sample rate.', 0., 0.5, 0.01)
+        st.write(f"Sampling {100*sample_rate}% of input items for the album lookups.")
+
     # Add a switch (checkbox)
     recommendation_switch = st.checkbox("Do you want artist/song recommendations?")
     st.write("Recommendations will also be provided.  Please be patient with the query.")
@@ -104,12 +108,21 @@ def main():
             ).properties(height=500, width=750))
 
         if option == analysis_options["detailed"]:
-            
             # Album summaries and plot
             with st.spinner('Please wait. Calculating your top albums...'):
+                # add a slider in here for the sample rate.
                 time.sleep(5)
-                year_top_albums_streams, year_top_albums_cum_time = unwrapped.get_yearly_top_albums(sample_rate=0.01)
-                st.write(f"### Your top 5 Albums by {out} are...\n{list(year_top_albums_streams['Album'])}")
+                year_top_artist_streams, year_top_albums_cum_time = unwrapped.get_yearly_top_albums(sample_rate)
+                unwrapped.get_yearly_album_artwork(year_top_artist_streams)
+                unwrapped.get_yearly_album_artwork(year_top_albums_cum_time)
+
+                for res, out in zip([year_top_artist_streams, year_top_albums_cum_time], ["Streams", "Time (hours)"]):
+                    st.write(f"### Your top 5 Albums by {out} are...")
+                    images = [f"album_artwork/{row['Artist']}_{row['Album']}.jpg" for _, row in res.iterrows()]
+                    captions = [f"{row['Artist']} - {row['Album']}" for _, row in res.iterrows()]
+                    st.image(images, caption=captions, width=125)
+                # for _, row in year_top_albums_streams.iterrows():
+                #     st.image(f"album_artwork/{row['Artist']}_{row['Album']}.jpg", caption=f"{row['Artist']} - {row['Album']}") #, use_column_width=True)
 
             # with st.spinner('Please wait. Calculating your top genres...'):
             #     time.sleep(5)
@@ -136,8 +149,6 @@ def main():
         # album summaries and plot
 
         if recommendation_switch:
-            #load_dotenv() # need .env in same directory as main.py
-            #open_ai_api_key = os.getenv("OPENAI_API_KEY")
             print("Getting the GPT predictions for artists...")
             top_artists_str = ""
             for a in year_top_artist_streams["Artist"]:
